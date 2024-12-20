@@ -7,6 +7,7 @@ import datetime
 import os
 import json
 import redis
+from fastapi import FastAPI, HTTPException
 
 # Configure location for astronomical calculations
 city = LocationInfo("Warsaw", "Poland", "Europe/Warsaw", 52.232222, 21.008333)
@@ -57,18 +58,19 @@ else:
 # Load voivodeship and powiat data
 voivodeships = gpd.read_file("Projekt-blok-2/Dane/woj.shp")
 powiats = gpd.read_file("Projekt-blok-2/Dane/powiaty.shp")
-# save both to geojsons
-voivodeships.to_file("Projekt-blok-2/Dane/woj.geojson", driver="GeoJSON")
-powiats.to_file("Projekt-blok-2/Dane/powiaty.geojson", driver="GeoJSON")
+# drop all columns except gmlid
+voivodeships_clean = voivodeships[['gmlid', 'geometry']]
+powiats_clean = powiats[['gmlid', 'geometry']]
+voivodeships_clean.to_file("Projekt-blok-2/Dane/woj.geojson", driver="GeoJSON")
+powiats_clean.to_file("Projekt-blok-2/Dane/powiaty.geojson", driver="GeoJSON")
 # load geojsons back as python jsons
 voivodeships_json = json.load(open("Projekt-blok-2/Dane/woj.geojson"))
 powiats_json = json.load(open("Projekt-blok-2/Dane/powiaty.geojson"))
-# print(voivodeships_json)
 
 # Load geospatial data (replace with actual file paths)
-geojson_file = "Projekt-blok-2/Dane/effacility.geojson"  # Replace with actual file name
-if os.path.isfile(geojson_file):
-    gdf_stations = gpd.read_file(geojson_file)
+geojson_path = "Projekt-blok-2/Dane/effacility.geojson"  # Replace with actual file name
+if os.path.isfile(geojson_path):
+    gdf_stations = gpd.read_file(geojson_path)
     # print(gdf_stations.head())
 else:
     print("GeoJSON file not found. Please verify the file path.")
@@ -115,15 +117,35 @@ redis_client = redis.Redis(host='localhost', port=6379, db=0)
 # add voivodeships and powiats to redis
 for voivodeship in voivodeships_json['features']:
     redis_client.hset('voivodeships', voivodeship['properties']['gmlid'], json.dumps(voivodeship))
+for powiat in powiats_json['features']:
+    redis_client.hset('powiaty', powiat['properties']['gmlid'], json.dumps(powiat))
 
-# get voivodeships and powiats from redis
-voivodeships_from_redis = redis_client.hgetall('voivodeships')
-powiats_from_redis = redis_client.hgetall('powiaty')
 
-print(f"Voivodeships from Redis: {voivodeships_from_redis}")
-print(f"Powiats from Redis: {powiats_from_redis}")
+app = FastAPI()
 
-# remove all data from redis
-redis_client.flushall()
+@app.get("/voivodeships")
+async def get_voivodeships():
+    return voivodeships_json
 
+@app.get("/powiats")
+async def get_powiats():
+    return powiats_json
+
+@app.get("/powiat/{powiat_gmlid}")
+async def get_powiat(powiat_gmlid: str):
+    # ask redis for the powiat
+    powiat = redis_client.hget('powiaty', powiat_gmlid)
+    if powiat is not None:
+        return powiat
+    else:
+        return HTTPException(status_code=404, detail="Powiat not found")
+
+@app.get("/voivodeship/{voivodeship_gmlid}")
+async def get_voivodeship(voivodeship_gmlid: str):
+    # ask redis for the voivodeship
+    voivodeship = redis_client.hget('voivodeships', voivodeship_gmlid)
+    if voivodeship is not None:
+        return voivodeship
+    else:
+        return HTTPException(status_code=404, detail="Voivodeship not found")
 
