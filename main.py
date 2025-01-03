@@ -64,8 +64,8 @@ powiats_clean = powiats[['gmlid', 'geometry']]
 voivodeships_clean.to_file("Projekt-blok-2/Dane/woj.geojson", driver="GeoJSON")
 powiats_clean.to_file("Projekt-blok-2/Dane/powiaty.geojson", driver="GeoJSON")
 # load geojsons back as python jsons
-voivodeships_json = json.load(open("Projekt-blok-2/Dane/woj.geojson"))
-powiats_json = json.load(open("Projekt-blok-2/Dane/powiaty.geojson"))
+voivodeships_clean_json = json.load(open("Projekt-blok-2/Dane/woj.geojson"))
+powiats_clean_json = json.load(open("Projekt-blok-2/Dane/powiaty.geojson"))
 
 # Load geospatial data (replace with actual file paths)
 geojson_path = "Projekt-blok-2/Dane/effacility.geojson"  # Replace with actual file name
@@ -115,21 +115,32 @@ else:
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 # add voivodeships and powiats to redis
-for voivodeship in voivodeships_json['features']:
+for voivodeship in voivodeships_clean_json['features']:
     redis_client.hset('voivodeships', voivodeship['properties']['gmlid'], json.dumps(voivodeship))
-for powiat in powiats_json['features']:
+for powiat in powiats_clean_json['features']:
     redis_client.hset('powiaty', powiat['properties']['gmlid'], json.dumps(powiat))
+# add clean voivodeships and powiats
+redis_client.hset('voivodeships_clean', 'geojsons', json.dumps(voivodeships_clean_json))
+redis_client.hset('powiaty_clean', 'geojsons', json.dumps(powiats_clean_json))
 
 
 app = FastAPI()
 
 @app.get("/voivodeships")
 async def get_voivodeships():
-    return voivodeships_json
+    # get voivodeships clean geojsons
+    voivodeships_clean = redis_client.hget('voivodeships_clean', 'geojsons')
+    if voivodeships_clean is None:
+        return HTTPException(status_code=500, detail="Internal server error")
+    return json.loads(voivodeships_clean)
 
 @app.get("/powiats")
 async def get_powiats():
-    return powiats_json
+    # get powiats clean geojsons
+    powiats_clean = redis_client.hget('powiaty_clean', 'geojsons')
+    if powiats_clean is None:
+        return HTTPException(status_code=500, detail="Internal server error")
+    return json.loads(powiats_clean)
 
 @app.get("/powiat/{powiat_gmlid}")
 async def get_powiat(powiat_gmlid: str):
