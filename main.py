@@ -8,6 +8,8 @@ import os
 import json
 import redis
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Configure location for astronomical calculations
 city = LocationInfo("Warsaw", "Poland", "Europe/Warsaw", 52.232222, 21.008333)
@@ -125,6 +127,13 @@ redis_client.hset('powiaty_clean', 'geojsons', json.dumps(powiats_clean_json))
 
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/voivodeships")
 async def get_voivodeships():

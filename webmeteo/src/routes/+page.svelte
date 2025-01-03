@@ -16,6 +16,19 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 	attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
 
+// request voivodeships from server
+const base_url = "http://0.0.0.0:8000";
+const url = `${base_url}/voivodeships`;
+
+fetch(url, {
+	method: "GET",
+})
+	.then((response) => response.json())
+	.then((data) => {
+    console.log(data);
+		L.geoJSON(data).addTo(map);
+	});
+
 </script>
 
 <style>
