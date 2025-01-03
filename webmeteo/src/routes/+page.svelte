@@ -25,8 +25,8 @@ fetch(url, {
 })
 	.then((response) => response.json())
 	.then((data) => {
-    console.log(data);
-		L.geoJSON(data).addTo(map);
+//{ style: { color: 'red', weight: 4 }
+    L.geoJSON(data, { style: { color: 'red', weight: 4 } }).addTo(map);
 	});
 
 </script>

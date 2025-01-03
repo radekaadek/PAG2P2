@@ -63,6 +63,9 @@ powiats = gpd.read_file("Projekt-blok-2/Dane/powiaty.shp")
 # drop all columns except gmlid
 voivodeships_clean = voivodeships[['gmlid', 'geometry']]
 powiats_clean = powiats[['gmlid', 'geometry']]
+# reproject to WGS84
+voivodeships_clean = voivodeships_clean.to_crs(epsg=4326)
+powiats_clean = powiats_clean.to_crs(epsg=4326)
 voivodeships_clean.to_file("Projekt-blok-2/Dane/woj.geojson", driver="GeoJSON")
 powiats_clean.to_file("Projekt-blok-2/Dane/powiaty.geojson", driver="GeoJSON")
 # load geojsons back as python jsons
