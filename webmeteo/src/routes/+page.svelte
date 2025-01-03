@@ -1,7 +1,3 @@
-<h1>Welcome to SvelteKit</h1>
-
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
-
 <script lang="ts">
 import L from "leaflet";
 
@@ -10,9 +6,10 @@ const mapdiv = document.createElement("div");
 document.body.appendChild(mapdiv);
 mapdiv.id = "map";
 // add height:180px to your svelte component
-mapdiv.style.height = "180px";
+mapdiv.style.height = "100vh";
+mapdiv.style.width = "100vw";
 
-const map = L.map("map").setView([51.505, -0.09], 13);
+const map = L.map("map").setView([52, 21], 7);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 	maxZoom: 19,
@@ -22,5 +19,4 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 </script>
 
 <style>
-/*#map { height: 180px; }*/
 </style>
