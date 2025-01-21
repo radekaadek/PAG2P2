@@ -19,7 +19,7 @@ def mongo_init(gj_path, mongo_adr):
     #Inserting data to mdb
     column.insert_many(geojson_dict["features"])
     column.create_index([("geometry", "2dsphere")])
-    return connection, database, column
+    return connection, column
 
 def mongo_get_by_polygon(column, poly):
     query = {
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     polygon_gdf = gpd.GeoDataFrame(geometry=[first_polygon], crs="EPSG:4326")
     polygon = mapping(first_polygon)
 
-    con, db, col = mongo_init(geojson_path, mongo_address)
+    con, col = mongo_init(geojson_path, mongo_address)
     features_by_polygon = mongo_get_by_polygon(col, polygon)
     con.close()
 
