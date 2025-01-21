@@ -34,6 +34,9 @@ def mongo_get_by_polygon(column, polygon_data):
         }
     }
     features = list(column.find(query))
+    for feature in features:
+        if "_id" in feature:
+            feature["_id"] = str(feature["_id"])
     return features
 
 if __name__ == '__main__':
