@@ -64,6 +64,7 @@ async def get_voivodeship(voivodeship_teryt: str):
     else:
         return HTTPException(status_code=404, detail="Voivodeship not found")
 
+import pymongo
 @app.get("/meteo/{voivodeship_teryt}")
 async def get_meteo(voivodeship_teryt: str):
     # ask mongo for meteos based on voivodeship
