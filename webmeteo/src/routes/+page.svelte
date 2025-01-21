@@ -1,11 +1,19 @@
+{#if loading}
+	<div id='loading'>Loading...</div>
+{/if}
+
+
 <script lang="ts">
 import L from "leaflet";
 
 const mapdiv = document.createElement("div");
+// set state to hidden
 document.body.appendChild(mapdiv);
 mapdiv.id = "map";
-mapdiv.style.height = "100vh";
-mapdiv.style.width = "100vw";
+mapdiv.style.height = "0vh";
+mapdiv.style.width = "0vw";
+
+let loading = $state(true);
 
 const map = L.map("map").setView([52, 21], 7);
 
@@ -44,6 +52,11 @@ fetch(voivodeships_url, {
 
     // Add the layer to the layer control
     layerControl.addOverlay(d, "Voivodeships");
+
+    // set loading to false
+    loading = false;
+    mapdiv.style.height = "100vh";
+    mapdiv.style.width = "100vw";
     
 	});
 
@@ -60,4 +73,12 @@ fetch(powiats_url, {
 </script>
 
 <style>
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: red;
+  font-size: 2em;
+}
 </style>
