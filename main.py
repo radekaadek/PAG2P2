@@ -64,11 +64,11 @@ async def get_voivodeship(voivodeship_teryt: str):
     else:
         return HTTPException(status_code=404, detail="Voivodeship not found")
 
+import pymongo
 @app.get("/meteo/{voivodeship_teryt}")
 async def get_meteo(voivodeship_teryt: str):
     # ask mongo for meteos based on voivodeship
     voivodeship = redis_client.hget('voivodeships', voivodeship_teryt)
-    print(voivodeship)
     if voivodeship is None:
         return HTTPException(status_code=404, detail="Voivodeship not found")
     features = mongo_get_by_polygon(col, voivodeship)
@@ -76,5 +76,3 @@ async def get_meteo(voivodeship_teryt: str):
         return HTTPException(status_code=404, detail="Meteo not found")
     return features
 
-redis_client.close()
-con.close()
