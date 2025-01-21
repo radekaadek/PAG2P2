@@ -3,12 +3,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from file_prep import prep_files
+from data2geojson import download_imgw_data, data2geojson
 from redis_fun import redis_init
 from mongo_fun import mongo_init, mongo_get_by_polygon
 
 #Prep files
 # prep_files() #makes geojson from shp (voivodeships, powiats)
-#TODO: stats from imgw
+#Imgw
+download_imgw_data()
+data2geojson()
 
 #Redis load data and init connection
 voivodeships_clean_json = "Projekt-blok-2/Dane/woj.geojson"
