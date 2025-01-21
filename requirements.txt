@@ -2,3 +2,6 @@ geopandas
 astral
 requests
 fastapi[standard]
+redis
+pymongo
+shapely
