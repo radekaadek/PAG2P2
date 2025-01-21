@@ -1,7 +1,9 @@
 import pymongo
 import json
 import geopandas as gpd
+from pyexpat import features
 from shapely.geometry import mapping
+import redis
 
 def mongo_init(gj_path, mongo_adr):
     #Reading geojson with data
@@ -21,7 +23,9 @@ def mongo_init(gj_path, mongo_adr):
     column.create_index([("geometry", "2dsphere")])
     return connection, column
 
-def mongo_get_by_polygon(column, poly):
+def mongo_get_by_polygon(column, polygon_data):
+    feature = json.loads(polygon_data)
+    poly = feature['geometry']
     query = {
         "geometry": {
             "$geoWithin": {
@@ -38,13 +42,15 @@ if __name__ == '__main__':
     woj_geojson_path = 'Projekt-blok-2/Dane/woj.geojson'
 
 
-    woj_gdf = gpd.read_file(woj_geojson_path)
-    first_polygon = woj_gdf.iloc[0].geometry
-    polygon_gdf = gpd.GeoDataFrame(geometry=[first_polygon], crs="EPSG:4326")
-    polygon = mapping(first_polygon)
+    # woj_gdf = gpd.read_file(woj_geojson_path)
+    # first_polygon = woj_gdf.iloc[0].geometry
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    polygon_data = redis_client.hget('voivodeships', '04')
 
+    # Initialize MongoDB and query by polygon
     con, col = mongo_init(geojson_path, mongo_address)
-    features_by_polygon = mongo_get_by_polygon(col, polygon)
+    features_by_polygon = mongo_get_by_polygon(col, polygon_data)
     con.close()
 
-    print(len(features_by_polygon))
+    print(features_by_polygon)
+

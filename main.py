@@ -46,23 +46,35 @@ async def get_powiats():
         return HTTPException(status_code=500, detail="Internal server error")
     return json.loads(powiats_clean)
 
-@app.get("/powiat/{powiat_gmlid}")
-async def get_powiat(powiat_gmlid: str):
+@app.get("/powiat/{powiat_teryt}")
+async def get_powiat(powiat_teryt: str):
     # ask redis for the powiat
-    powiat = redis_client.hget('powiaty', powiat_gmlid)
+    powiat = redis_client.hget('powiaty', powiat_teryt)
     if powiat is not None:
         return powiat
     else:
         return HTTPException(status_code=404, detail="Powiat not found")
 
-@app.get("/voivodeship/{voivodeship_gmlid}")
-async def get_voivodeship(voivodeship_gmlid: str):
+@app.get("/voivodeship/{voivodeship_teryt}")
+async def get_voivodeship(voivodeship_teryt: str):
     # ask redis for the voivodeship
-    voivodeship = redis_client.hget('voivodeships', voivodeship_gmlid)
+    voivodeship = redis_client.hget('voivodeships', voivodeship_teryt)
     if voivodeship is not None:
         return voivodeship
     else:
         return HTTPException(status_code=404, detail="Voivodeship not found")
+
+@app.get("/meteo/{voivodeship_teryt}")
+async def get_meteo(voivodeship_teryt: str):
+    # ask mongo for meteos based on voivodeship
+    voivodeship = redis_client.hget('voivodeships', voivodeship_teryt)
+    print(voivodeship)
+    if voivodeship is None:
+        return HTTPException(status_code=404, detail="Voivodeship not found")
+    features = mongo_get_by_polygon(col, voivodeship)
+    if features is None:
+        return HTTPException(status_code=404, detail="Meteo not found")
+    return features
 
 redis_client.close()
 con.close()

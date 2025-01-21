@@ -9,12 +9,13 @@ def redis_init(voivodeships_path, powiats_path):
 
     # Example: Storing data in Redis
     redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    redis_client.flushdb()
 
     # add voivodeships and powiats to redis
     for voivodeship in voivodeships_clean_json['features']:
-        redis_client.hset('voivodeships', voivodeship['properties']['gmlid'], json.dumps(voivodeship))
+        redis_client.hset('voivodeships', voivodeship['properties']['national_c'], json.dumps(voivodeship))
     for powiat in powiats_clean_json['features']:
-        redis_client.hset('powiaty', powiat['properties']['gmlid'], json.dumps(powiat))
+        redis_client.hset('powiaty', powiat['properties']['national_c'], json.dumps(powiat))
     # add clean voivodeships and powiats
     redis_client.hset('voivodeships_clean', 'geojsons', json.dumps(voivodeships_clean_json))
     redis_client.hset('powiaty_clean', 'geojsons', json.dumps(powiats_clean_json))
