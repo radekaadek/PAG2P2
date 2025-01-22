@@ -25,6 +25,7 @@
   let resetButton: HTMLButtonElement | null = null;
   let geoJsonLayer: L.GeoJSON | null = null;
   let sliderValue = 1; // Initial slider value
+  let sliderContainer: HTMLDivElement | null = null;
 
   const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -37,71 +38,68 @@
 
   const layerControl = L.control.layers(baseMaps).addTo(map);
 
-// Helper function to calculate color based on temperature
-function getColorForTemperature(temp: number | null): string {
-  if (temp === null) {
-    return "gray"; // Gray for null values
-  }
-  
-  // Map temperature directly to a color gradient from blue (-40) to red (40)
-  const minTemp = -8; // Minimum temperature
-  const maxTemp = 25;  // Maximum temperature
-  const clampedTemp = Math.max(minTemp, Math.min(maxTemp, temp)); // Clamp between -40 and 40
-
-  // Use HSL to generate colors: blue (240) -> red (0)
-  const hue = ((maxTemp - clampedTemp) / (maxTemp - minTemp)) * 240; // 240 is blue, 0 is red
-  return `hsl(${hue}, 100%, 50%)`;
-}
-
-// Update the fetchFeaturesAndAddMarkers function
-async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): Promise<void> {
-  try {
-    const response = await fetch(`${url}/${id}`, {
-      method: "GET",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch features: ${response.statusText}`);
+  // Helper function to calculate color based on temperature
+  function getColorForTemperature(temp: number | null): string {
+    if (temp === null) {
+      return "gray"; // Gray for null values
     }
 
-    const data = await response.json();
+    const minTemp = -8; // Minimum temperature
+    const maxTemp = 25;  // Maximum temperature
+    const clampedTemp = Math.max(minTemp, Math.min(maxTemp, temp)); // Clamp between -40 and 40
 
-    if (currentMarkersLayer) {
-      map.removeLayer(currentMarkersLayer);
-    }
-
-    // Convert GeoJSON features to Leaflet markers and add them to the map
-    currentMarkersLayer = L.geoJSON(data, {
-      pointToLayer: (feature, latlng) => {
-        const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
-        const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
-
-        const marker = L.circleMarker(latlng, {
-          radius: 8, // Adjust marker size as needed
-          fillColor: color,
-          color: "#000", // Border color
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8,
-        });
-
-        const tooltipContent = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
-        marker.bindTooltip(tooltipContent, { className: "custom-tooltip" });
-
-        return marker;
-      },
-    });
-
-    currentMarkersLayer.addTo(map);
-    map.fitBounds(currentMarkersLayer.getBounds(), {
-      padding: [10, 10], // Add a small margin around the markers
-    });
-    console.log("Markers added successfully");
-  } catch (error) {
-    console.error("Error fetching and adding markers:", error);
+    const hue = ((maxTemp - clampedTemp) / (maxTemp - minTemp)) * 240; // 240 is blue, 0 is red
+    return `hsl(${hue}, 100%, 50%)`;
   }
-}
 
+  // Update the fetchFeaturesAndAddMarkers function
+  async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): Promise<void> {
+    try {
+      const response = await fetch(`${url}/${id}`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch features: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (currentMarkersLayer) {
+        map.removeLayer(currentMarkersLayer);
+      }
+
+      // Convert GeoJSON features to Leaflet markers and add them to the map
+      currentMarkersLayer = L.geoJSON(data, {
+        pointToLayer: (feature, latlng) => {
+          const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
+          const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+
+          const marker = L.circleMarker(latlng, {
+            radius: 8,
+            fillColor: color,
+            color: "#000", // Border color
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+          });
+
+          const tooltipContent = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
+          marker.bindTooltip(tooltipContent, { className: "custom-tooltip" });
+
+          return marker;
+        },
+      });
+
+      currentMarkersLayer.addTo(map);
+      map.fitBounds(currentMarkersLayer.getBounds(), {
+        padding: [10, 10], // Add a small margin around the markers
+      });
+      console.log("Markers added successfully");
+    } catch (error) {
+      console.error("Error fetching and adding markers:", error);
+    }
+  }
 
   // Helper function to get the correct mean value based on slider value
   function getMeanValue(feature: any, sliderValue: number): string {
@@ -111,28 +109,28 @@ async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): 
   }
 
   function updateMarkerTooltips() {
-  if (currentMarkersLayer) {
-    currentMarkersLayer.eachLayer((layer) => {
-      if (layer instanceof L.CircleMarker) {
-        const feature = layer.feature;
-        if (feature !== undefined) {
-          // Get updated mean temperature for the selected month
-          const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
-          const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+    if (currentMarkersLayer) {
+      currentMarkersLayer.eachLayer((layer) => {
+        if (layer instanceof L.CircleMarker) {
+          const feature = layer.feature;
+          if (feature !== undefined) {
+            // Get updated mean temperature for the selected month
+            const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
+            const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
 
-          // Update tooltip content
-          const updatedTooltip = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
-          layer.setTooltipContent(updatedTooltip);
+            // Update tooltip content
+            const updatedTooltip = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
+            layer.setTooltipContent(updatedTooltip);
 
-          // Update marker color
-          layer.setStyle({
-            fillColor: color,
-          });
+            // Update marker color
+            layer.setStyle({
+              fillColor: color,
+            });
+          }
         }
-      }
-    });
+      });
+    }
   }
-}
 
   fetch(voivodeships_url, { method: "GET" })
     .then((response) => response.json())
@@ -163,6 +161,7 @@ async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): 
               });
               fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
               showResetButton();
+              showSlider(); // Show the slider when a feature is selected
             } else {
               console.error("Feature does not have a 'national_c' property");
             }
@@ -176,7 +175,7 @@ async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): 
       loading = false;
       mapdiv.style.height = "100vh";
       mapdiv.style.width = "100vw";
-      showSlider();
+      map.invalidateSize();
     });
 
   // Reset map
@@ -196,7 +195,8 @@ async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): 
 
       resetButton.addEventListener("click", () => {
         resetMap();
-        hideResetButton(); // Hide the button after it is pressed
+        hideResetButton();
+        hideSlider();
       });
 
       document.body.appendChild(resetButton);
@@ -232,61 +232,104 @@ async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): 
 
   // Slider
   function showSlider() {
-    const sliderContainer = document.createElement("div");
-  sliderContainer.style.position = "absolute";
-  sliderContainer.style.bottom = "10px";
-  sliderContainer.style.left = "20px";
-  sliderContainer.style.zIndex = "1000";
-  sliderContainer.style.textAlign = "center";
-  sliderContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
-  sliderContainer.style.padding = "10px";
-  sliderContainer.style.borderRadius = "5px";
-  sliderContainer.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.3)";
+    if (!sliderContainer) {
+      sliderContainer = document.createElement("div");
+      sliderContainer.style.position = "absolute";
+      sliderContainer.style.bottom = "10px";
+      sliderContainer.style.left = "20px";
+      sliderContainer.style.zIndex = "1000";
+      sliderContainer.style.textAlign = "center";
+      sliderContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+      sliderContainer.style.padding = "10px";
+      sliderContainer.style.borderRadius = "5px";
+      sliderContainer.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.3)";
 
-    const sliderLabelContainer = document.createElement("div");
-    sliderLabelContainer.style.marginBottom = "10px"; // Space above the slider
+      const sliderLabelContainer = document.createElement("div");
+      sliderLabelContainer.style.marginBottom = "10px";
 
-    const label = document.createElement("label");
-    label.textContent = "Month: ";
+      const label = document.createElement("label");
+      label.textContent = "Month: ";
 
-    const sliderValueDisplay = document.createElement("span");
-    sliderValueDisplay.textContent = sliderValue.toString();
-
-    sliderLabelContainer.appendChild(label);
-    sliderLabelContainer.appendChild(sliderValueDisplay);
-
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "1";
-    slider.max = "12";
-    slider.value = sliderValue.toString();
-    slider.style.width = "200px";
-
-    slider.addEventListener("input", (event) => {
-      sliderValue = parseInt((event.target as HTMLInputElement).value);
+      const sliderValueDisplay = document.createElement("span");
       sliderValueDisplay.textContent = sliderValue.toString();
-      if (currentMarkersLayer) {
-        updateMarkerTooltips();
-      }
-    });
 
-    sliderContainer.appendChild(sliderLabelContainer);
-    sliderContainer.appendChild(slider);
-    document.body.appendChild(sliderContainer);
+      sliderLabelContainer.appendChild(label);
+      sliderLabelContainer.appendChild(sliderValueDisplay);
+
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = "1";
+      slider.max = "12";
+      slider.value = sliderValue.toString();
+      slider.style.width = "200px";
+
+      slider.addEventListener("input", (event) => {
+        sliderValue = parseInt((event.target as HTMLInputElement).value);
+        sliderValueDisplay.textContent = sliderValue.toString();
+        if (currentMarkersLayer) {
+          updateMarkerTooltips();
+        }
+      });
+
+      sliderContainer.appendChild(sliderLabelContainer);
+      sliderContainer.appendChild(slider);
+      document.body.appendChild(sliderContainer);
+    }
+  }
+
+  function hideSlider() {
+    if (sliderContainer) {
+      document.body.removeChild(sliderContainer);
+      sliderContainer = null;
+    }
   }
 </script>
 
 {#if loading}
-  <div id="loading">Loading...</div>
+  <div class="loader-wrapper">
+    <div class="loader"></div>
+  </div>
 {/if}
 
 <style>
-  #loading {
+  .loader-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+  }
+
+  .loader {
+    width: 44.8px;
+    height: 44.8px;
+    position: relative;
+    transform: rotate(45deg);
+  }
+
+  .loader:before,
+  .loader:after {
+    content: "";
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: red;
-    font-size: 2em;
+    inset: 0;
+    border-radius: 50% 50% 0 50%;
+    background: #0000;
+    background-image: radial-gradient(circle 11.2px at 50% 50%,#0000 94%, #ff4747);
+  }
+
+  .loader:after {
+    animation: pulse-ytk0dhmd 1s infinite;
+    transform: perspective(336px) translateZ(0px);
+  }
+
+  @keyframes pulse-ytk0dhmd {
+    to {
+      transform: perspective(336px) translateZ(168px);
+      opacity: 0;
+    }
   }
 </style>
