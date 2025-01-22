@@ -10,8 +10,8 @@ from mongo_fun import mongo_init, mongo_get_by_polygon
 #Prep files
 # prep_files() #makes geojson from shp (voivodeships, powiats)
 #Imgw
-download_imgw_data()
-data2geojson()
+# download_imgw_data()
+# data2geojson()
 
 #Redis load data and init connection
 voivodeships_clean_json = "Projekt-blok-2/Dane/woj.geojson"
@@ -67,7 +67,6 @@ async def get_voivodeship(voivodeship_teryt: str):
     else:
         return HTTPException(status_code=404, detail="Voivodeship not found")
 
-import pymongo
 @app.get("/meteo/{voivodeship_teryt}")
 async def get_meteo(voivodeship_teryt: str):
     # ask mongo for meteos based on voivodeship

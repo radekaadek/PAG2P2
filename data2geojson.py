@@ -58,12 +58,12 @@ def data2geojson(baza = r'Projekt-blok-2\dane\effacility.geojson', output_direct
 
     mean_tab = pd.concat(mean_tab, axis=1)
     mean_tab.columns = ['mean1', 'mean2', 'mean3', 'mean4', 'mean5', 'mean6', 'mean7', 'mean8', 'mean9', 'mean10', 'mean11', 'mean12']
-    mean_tab.to_csv('mean_tab.csv')
+    mean_tab.to_csv('Projekt-blok-2/Dane/data_meteo/mean_tab.csv')
     geo_data = gpd.read_file(baza)
     table = gpd.GeoDataFrame(columns=['_id', 'name', 'additional', 'mean1', 'mean2', 'mean3', 'mean4', 'mean5', 'mean6', 'mean7', 'mean8', 'mean9', 'mean10', 'mean11', 'mean12', 'geometry'])
 
     rows = []
-    mean_tab = pd.read_csv('mean_tab.csv')
+    mean_tab = pd.read_csv('Projekt-blok-2/Dane/data_meteo/mean_tab.csv')
     for kodsh in mean_tab['KodSH'][1:]:
         try:
             geo_row = geo_data[geo_data['ifcid'] == int(kodsh)]

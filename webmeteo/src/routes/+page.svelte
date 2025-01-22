@@ -1,8 +1,7 @@
 <script lang="ts">
-  import L from "leaflet";
+  import L, { LatLngBounds } from "leaflet";
 
   const mapdiv = document.createElement("div");
-  // set state to hidden
   document.body.appendChild(mapdiv);
   mapdiv.id = "map";
   mapdiv.style.height = "0vh";
@@ -10,7 +9,8 @@
 
   let loading = $state(true);
 
-  const map = L.map("map").setView([52, 21], 7);
+  const initialView = { center: [52, 19] as L.LatLngTuple, zoom: 7 };
+  const map = L.map("map").setView(initialView.center, initialView.zoom);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -18,56 +18,262 @@
       '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
-  // request voivodeships from server
-  const base_url = "http://0.0.0.0:8000";
+  const base_url = "http://localhost:8000";
   const voivodeships_url = `${base_url}/voivodeships`;
-  const powiats_url = `${base_url}/powiats`;
+
+  let currentMarkersLayer: L.GeoJSON | null = null;
+  let resetButton: HTMLButtonElement | null = null;
+  let geoJsonLayer: L.GeoJSON | null = null;
+  let sliderValue = 1; // Initial slider value
 
   const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "© OpenStreetMap",
   });
-  const osmHOT = L.tileLayer(
-    "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution:
-        "© OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team hosted by OpenStreetMap France",
-    },
-  );
+
   const baseMaps = {
     OpenStreetMap: osm,
-    "OpenStreetMap.HOT": osmHOT,
   };
 
   const layerControl = L.control.layers(baseMaps).addTo(map);
 
-  fetch(voivodeships_url, {
-    method: "GET",
-  })
+// Helper function to calculate color based on temperature
+function getColorForTemperature(temp: number | null): string {
+  if (temp === null) {
+    return "gray"; // Gray for null values
+  }
+  
+  // Map temperature directly to a color gradient from blue (-40) to red (40)
+  const minTemp = -8; // Minimum temperature
+  const maxTemp = 25;  // Maximum temperature
+  const clampedTemp = Math.max(minTemp, Math.min(maxTemp, temp)); // Clamp between -40 and 40
+
+  // Use HSL to generate colors: blue (240) -> red (0)
+  const hue = ((maxTemp - clampedTemp) / (maxTemp - minTemp)) * 240; // 240 is blue, 0 is red
+  return `hsl(${hue}, 100%, 50%)`;
+}
+
+// Update the fetchFeaturesAndAddMarkers function
+async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): Promise<void> {
+  try {
+    const response = await fetch(`${url}/${id}`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch features: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (currentMarkersLayer) {
+      map.removeLayer(currentMarkersLayer);
+    }
+
+    // Convert GeoJSON features to Leaflet markers and add them to the map
+    currentMarkersLayer = L.geoJSON(data, {
+      pointToLayer: (feature, latlng) => {
+        const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
+        const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+
+        const marker = L.circleMarker(latlng, {
+          radius: 8, // Adjust marker size as needed
+          fillColor: color,
+          color: "#000", // Border color
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
+
+        const tooltipContent = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
+        marker.bindTooltip(tooltipContent, { className: "custom-tooltip" });
+
+        return marker;
+      },
+    });
+
+    currentMarkersLayer.addTo(map);
+    map.fitBounds(currentMarkersLayer.getBounds(), {
+      padding: [10, 10], // Add a small margin around the markers
+    });
+    console.log("Markers added successfully");
+  } catch (error) {
+    console.error("Error fetching and adding markers:", error);
+  }
+}
+
+
+  // Helper function to get the correct mean value based on slider value
+  function getMeanValue(feature: any, sliderValue: number): string {
+    const meanKey = `mean${sliderValue}`;
+    const value = feature.properties?.[meanKey];
+    return value !== undefined ? parseFloat(value).toFixed(1) : "N/A"; // Round to 1 decimal place
+  }
+
+  function updateMarkerTooltips() {
+  if (currentMarkersLayer) {
+    currentMarkersLayer.eachLayer((layer) => {
+      if (layer instanceof L.CircleMarker) {
+        const feature = layer.feature;
+        if (feature !== undefined) {
+          // Get updated mean temperature for the selected month
+          const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
+          const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+
+          // Update tooltip content
+          const updatedTooltip = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
+          layer.setTooltipContent(updatedTooltip);
+
+          // Update marker color
+          layer.setStyle({
+            fillColor: color,
+          });
+        }
+      }
+    });
+  }
+}
+
+  fetch(voivodeships_url, { method: "GET" })
     .then((response) => response.json())
     .then((data) => {
-      const d = L.geoJSON(data, { style: { color: "red", weight: 4 } });
-      // Add the layer to the map directly
-      d.addTo(map); // 'map' is your Leaflet map instance
+      geoJsonLayer = L.geoJSON(data, {
+        style: { color: "red", weight: 4, fillColor: "red", fillOpacity: 0.2 },
+        onEachFeature: (feature, layer) => {
+          layer.on("click", () => {
+            if (feature.properties && feature.properties.national_c) {
+              geoJsonLayer?.eachLayer((otherLayer) => {
+                if (otherLayer instanceof L.Path) {
+                  if (otherLayer === layer) {
+                    otherLayer.setStyle({
+                      fillOpacity: 0,
+                      color: "blue",
+                      weight: 4,
+                    });
+                    otherLayer.bringToFront();
+                  } else {
+                    otherLayer.setStyle({
+                      fillOpacity: 0.2,
+                      fillColor: "red",
+                      color: "red",
+                      weight: 4,
+                    });
+                  }
+                }
+              });
+              fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
+              showResetButton();
+            } else {
+              console.error("Feature does not have a 'national_c' property");
+            }
+          });
+        },
+      });
 
-      // Add the layer to the layer control
-      layerControl.addOverlay(d, "Voivodeships");
+      geoJsonLayer.addTo(map);
+      layerControl.addOverlay(geoJsonLayer, "Voivodeships");
 
-      // set loading to false
       loading = false;
       mapdiv.style.height = "100vh";
       mapdiv.style.width = "100vw";
+      showSlider();
     });
 
-  fetch(powiats_url, {
-    method: "GET",
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      const d = L.geoJSON(data, { style: { color: "blue", weight: 4 } });
-      layerControl.addOverlay(d, "Powiaty");
+  // Reset map
+  function showResetButton() {
+    if (!resetButton) {
+      resetButton = document.createElement("button");
+      resetButton.textContent = "Reset View";
+      resetButton.style.position = "absolute";
+      resetButton.style.top = "20px";
+      resetButton.style.left = "50px";
+      resetButton.style.zIndex = "1000";
+      resetButton.style.padding = "10px 15px";
+      resetButton.style.background = "white";
+      resetButton.style.border = "1px solid black";
+      resetButton.style.borderRadius = "5px";
+      resetButton.style.cursor = "pointer";
+
+      resetButton.addEventListener("click", () => {
+        resetMap();
+        hideResetButton(); // Hide the button after it is pressed
+      });
+
+      document.body.appendChild(resetButton);
+    }
+  }
+
+  function hideResetButton() {
+    if (resetButton) {
+      document.body.removeChild(resetButton);
+      resetButton = null;
+    }
+  }
+
+  function resetMap() {
+    map.setView(initialView.center, initialView.zoom);
+    if (currentMarkersLayer) {
+      map.removeLayer(currentMarkersLayer);
+      currentMarkersLayer = null;
+    }
+    if (geoJsonLayer) {
+      geoJsonLayer.eachLayer((layer) => {
+        if (layer instanceof L.Path) {
+          layer.setStyle({
+            fillOpacity: 0.2,
+            fillColor: "red",
+            color: "red",
+            weight: 4,
+          });
+        }
+      });
+    }
+  }
+
+  // Slider
+  function showSlider() {
+    const sliderContainer = document.createElement("div");
+  sliderContainer.style.position = "absolute";
+  sliderContainer.style.bottom = "10px";
+  sliderContainer.style.left = "20px";
+  sliderContainer.style.zIndex = "1000";
+  sliderContainer.style.textAlign = "center";
+  sliderContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
+  sliderContainer.style.padding = "10px";
+  sliderContainer.style.borderRadius = "5px";
+  sliderContainer.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.3)";
+
+    const sliderLabelContainer = document.createElement("div");
+    sliderLabelContainer.style.marginBottom = "10px"; // Space above the slider
+
+    const label = document.createElement("label");
+    label.textContent = "Month: ";
+
+    const sliderValueDisplay = document.createElement("span");
+    sliderValueDisplay.textContent = sliderValue.toString();
+
+    sliderLabelContainer.appendChild(label);
+    sliderLabelContainer.appendChild(sliderValueDisplay);
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "1";
+    slider.max = "12";
+    slider.value = sliderValue.toString();
+    slider.style.width = "200px";
+
+    slider.addEventListener("input", (event) => {
+      sliderValue = parseInt((event.target as HTMLInputElement).value);
+      sliderValueDisplay.textContent = sliderValue.toString();
+      if (currentMarkersLayer) {
+        updateMarkerTooltips();
+      }
     });
+
+    sliderContainer.appendChild(sliderLabelContainer);
+    sliderContainer.appendChild(slider);
+    document.body.appendChild(sliderContainer);
+  }
 </script>
 
 {#if loading}
