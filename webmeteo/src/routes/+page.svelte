@@ -243,7 +243,6 @@
   }
 
   // Function to update the powiat colors and tooltips when the slider value changes
-  // Function to update the powiat colors and tooltips when the slider value changes
   async function updatePowiatColorsAndTooltips() {
     if (powiatGeoJsonLayer) {
       powiatGeoJsonLayer.eachLayer(async (layer) => {
@@ -292,15 +291,17 @@
     if (!resetButton) {
       resetButton = document.createElement("button");
       resetButton.textContent = "Reset View";
-      resetButton.style.position = "absolute";
-      resetButton.style.top = "20px";
-      resetButton.style.left = "50px";
-      resetButton.style.zIndex = "1000";
-      resetButton.style.padding = "10px 15px";
-      resetButton.style.background = "white";
-      resetButton.style.border = "1px solid black";
-      resetButton.style.borderRadius = "5px";
-      resetButton.style.cursor = "pointer";
+      Object.assign(resetButton.style, {
+        position: "absolute",
+        top: "20px",
+        left: "50px",
+        zIndex: "1000",
+        padding: "10px 15px",
+        background: "white",
+        border: "1px solid black",
+        borderRadius: "5px",
+        cursor: "pointer"
+      });
 
       resetButton.addEventListener("click", () => {
         resetMap();
@@ -399,17 +400,16 @@
   }
 
   fetch(voivodeships_url, { method: "GET" })
-    .then((response) => {
+    .then(async (response) => {
       if (!response.ok) {
         throw new Error(`Failed to fetch voivodeships: ${response.statusText}`);
       }
-      return response.text().then((text) => {
+      const text = await response.text();
         try {
-          return JSON.parse(text);
+            return JSON.parse(text);
         } catch (jsonError) {
-          throw new Error(`Failed to parse JSON: ${jsonError}`);
+            throw new Error(`Failed to parse JSON: ${jsonError}`);
         }
-      });
     })
     .then((data) => {
       geoJsonLayer = L.geoJSON(data, {
