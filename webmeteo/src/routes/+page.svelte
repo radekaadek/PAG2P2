@@ -1,4 +1,6 @@
 <script lang="ts">
+  import L from "leaflet";
+
   const mapdiv = document.createElement("div");
   document.body.appendChild(mapdiv);
   mapdiv.id = "map";
@@ -67,7 +69,12 @@
         throw new Error(`Failed to fetch features: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error(`Failed to parse JSON: ${jsonError}`);
+      }
 
       if (currentMarkersLayer) {
         map.removeLayer(currentMarkersLayer);
@@ -153,7 +160,12 @@
         throw new Error(`Failed to fetch powiats: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error(`Failed to parse JSON: ${jsonError}`);
+      }
 
       // Clear the existing powiat layer if it exists
       if (powiatGeoJsonLayer) {
@@ -214,7 +226,12 @@
         );
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error(`Failed to parse JSON: ${jsonError}`);
+      }
       const meanKey = `mean${sliderValue}`;
       const meanTemp = data[meanKey];
 
@@ -328,15 +345,17 @@
   function showSlider() {
     if (!sliderContainer) {
       sliderContainer = document.createElement("div");
-      sliderContainer.style.position = "absolute";
-      sliderContainer.style.bottom = "10px";
-      sliderContainer.style.left = "20px";
-      sliderContainer.style.zIndex = "1000";
-      sliderContainer.style.textAlign = "center";
-      sliderContainer.style.backgroundColor = "rgba(255, 255, 255, 0.8)";
-      sliderContainer.style.padding = "10px";
-      sliderContainer.style.borderRadius = "5px";
-      sliderContainer.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.3)";
+      Object.assign(sliderContainer.style, {
+        position: "absolute",
+        bottom: "10px",
+        left: "20px",
+        zIndex: "1000",
+        textAlign: "center",
+        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        padding: "10px",
+        borderRadius: "5px",
+        boxShadow: "0 2px 5px rgba(0, 0, 0, 0.3)"
+      });
 
       const sliderLabelContainer = document.createElement("div");
       sliderLabelContainer.style.marginBottom = "10px";
@@ -351,11 +370,13 @@
       sliderLabelContainer.appendChild(sliderValueDisplay);
 
       const slider = document.createElement("input");
-      slider.type = "range";
-      slider.min = "1";
-      slider.max = "12";
-      slider.value = sliderValue.toString();
-      slider.style.width = "200px";
+      Object.assign(slider, {
+        type: "range",
+        min: "1",
+        max: "12",
+        value: sliderValue.toString(),
+        style: "width: 200px"
+      });
 
       slider.addEventListener("input", (event) => {
         sliderValue = parseInt((event.target as HTMLInputElement).value);
@@ -378,7 +399,18 @@
   }
 
   fetch(voivodeships_url, { method: "GET" })
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch voivodeships: ${response.statusText}`);
+      }
+      return response.text().then((text) => {
+        try {
+          return JSON.parse(text);
+        } catch (jsonError) {
+          throw new Error(`Failed to parse JSON: ${jsonError}`);
+        }
+      });
+    })
     .then((data) => {
       geoJsonLayer = L.geoJSON(data, {
         style: { color: "red", weight: 4, fillColor: "red", fillOpacity: 0.2 },
