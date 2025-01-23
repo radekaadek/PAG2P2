@@ -3,7 +3,7 @@ import geopandas as gpd
 import requests, zipfile, io
 import os
 
-def download_imgw_data(output_directory = "Projekt-blok-2\data_meteo"):
+def download_imgw_data(output_directory = r"Projekt-blok-2\data_meteo"):
     # Function to download and extract data
     def fetch_and_extract_data(url: str, output_dir: str) -> None:
         """
@@ -68,7 +68,7 @@ def data2geojson(baza = r'Projekt-blok-2\dane\effacility.geojson', output_direct
         try:
             geo_row = geo_data[geo_data['ifcid'] == int(kodsh)]
         except ValueError:
-            pass
+            continue
         if not geo_row.empty:
             row = {
                 '_id': kodsh,
