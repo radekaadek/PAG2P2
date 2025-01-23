@@ -1,7 +1,4 @@
 <script lang="ts">
-  import L, { LatLngBounds } from "leaflet";
-  import { get } from "svelte/store";
-
   const mapdiv = document.createElement("div");
   document.body.appendChild(mapdiv);
   mapdiv.id = "map";
@@ -48,7 +45,7 @@
     }
 
     const minTemp = -8; // Minimum temperature
-    const maxTemp = 25;  // Maximum temperature
+    const maxTemp = 25; // Maximum temperature
     const clampedTemp = Math.max(minTemp, Math.min(maxTemp, temp)); // Clamp between -40 and 40
 
     const hue = ((maxTemp - clampedTemp) / (maxTemp - minTemp)) * 240; // 240 is blue, 0 is red
@@ -56,7 +53,11 @@
   }
 
   // Update the fetchFeaturesAndAddMarkers function
-  async function fetchFeaturesAndAddMarkers(url: string, id: string, map: L.Map): Promise<void> {
+  async function fetchFeaturesAndAddMarkers(
+    url: string,
+    id: string,
+    map: L.Map,
+  ): Promise<void> {
     try {
       const response = await fetch(`${url}/${id}`, {
         method: "GET",
@@ -69,15 +70,17 @@
       const data = await response.json();
 
       if (currentMarkersLayer) {
-      map.removeLayer(currentMarkersLayer);
-      layerControl.removeLayer(currentMarkersLayer); // Remove from layer control
-    }
+        map.removeLayer(currentMarkersLayer);
+        layerControl.removeLayer(currentMarkersLayer); // Remove from layer control
+      }
 
       // Convert GeoJSON features to Leaflet markers and add them to the map
       currentMarkersLayer = L.geoJSON(data, {
         pointToLayer: (feature, latlng) => {
           const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
-          const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+          const color = getColorForTemperature(
+            isNaN(meanTemp) ? null : meanTemp,
+          );
 
           const marker = L.circleMarker(latlng, {
             radius: 15,
@@ -118,7 +121,9 @@
           if (feature !== undefined) {
             // Get updated mean temperature for the selected month
             const meanTemp = parseFloat(getMeanValue(feature, sliderValue));
-            const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
+            const color = getColorForTemperature(
+              isNaN(meanTemp) ? null : meanTemp,
+            );
 
             // Update tooltip content
             const updatedTooltip = `<b>${feature.properties?.name || "Marker"}</b><br>Avrg Temp: ${meanTemp || "N/A"}`;
@@ -134,39 +139,50 @@
     }
   }
 
-  async function fetchPowiatsAndAddToMap(url: string, id: string, map: L.Map): Promise<void> {
+  async function fetchPowiatsAndAddToMap(
+    url: string,
+    id: string,
+    map: L.Map,
+  ): Promise<void> {
     try {
       const response = await fetch(`${url}/${id}`, {
         method: "GET",
       });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch powiats: ${response.statusText}`);
-    }
+      if (!response.ok) {
+        throw new Error(`Failed to fetch powiats: ${response.statusText}`);
+      }
 
-    const data = await response.json();
+      const data = await response.json();
 
-    // Clear the existing powiat layer if it exists
-    if (powiatGeoJsonLayer) {
-      map.removeLayer(powiatGeoJsonLayer);
-      layerControl.removeLayer(powiatGeoJsonLayer);
-    }
+      // Clear the existing powiat layer if it exists
+      if (powiatGeoJsonLayer) {
+        map.removeLayer(powiatGeoJsonLayer);
+        layerControl.removeLayer(powiatGeoJsonLayer);
+      }
 
-    // Convert GeoJSON features to Leaflet polygons and add them to the map
-    powiatGeoJsonLayer = L.geoJSON(data, {
-        style: { color: "black", weight: 2, fillColor: "grey", fillOpacity: 0.3 },
+      // Convert GeoJSON features to Leaflet polygons and add them to the map
+      powiatGeoJsonLayer = L.geoJSON(data, {
+        style: {
+          color: "black",
+          weight: 2,
+          fillColor: "grey",
+          fillOpacity: 0.3,
+        },
         onEachFeature: async (feature, layer) => {
-          const meanTemp = await fetchPowiatMeteoData(feature.properties?.national_c, sliderValue);
+          const meanTemp = await fetchPowiatMeteoData(
+            feature.properties?.national_c,
+            sliderValue,
+          );
           const tooltipContent = `Avg Temp: ${meanTemp || "N/A"}`;
-          layer.bindTooltip(tooltipContent, { 
+          layer.bindTooltip(tooltipContent, {
             className: "custom-tooltip", // Optional: Add a class for custom styling
             permanent: false, // Optional: Tooltips will show on hover, not always visible
-            offset: [0, -10] // Optional: Adjust the tooltip position
+            offset: [0, -10], // Optional: Adjust the tooltip position
           });
-        }
+        },
       });
-    }
-    catch (error) {
+    } catch (error) {
       console.error("Error fetching and adding powiats:", error);
     }
     if (powiatGeoJsonLayer) {
@@ -176,80 +192,83 @@
       layerControl.addOverlay(powiatGeoJsonLayer, "Powiats");
 
       map.fitBounds(powiatGeoJsonLayer.getBounds(), {
-          padding: [10, 10], // Add a small margin around the markers
-    });
-    updatePowiatColorsAndTooltips();
-  }
-}
-
-
-// Helper function to fetch powiat mean temperatures for the selected month
-async function fetchPowiatMeteoData(teryt: string, sliderValue: number): Promise<number | null> {
-  try {
-    const response = await fetch(`${base_url}/powiat_meteo/${teryt}`, {
-      method: "GET",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch powiat meteo data: ${response.statusText}`);
+        padding: [10, 10], // Add a small margin around the markers
+      });
+      updatePowiatColorsAndTooltips();
     }
-
-    const data = await response.json();
-    const meanKey = `mean${sliderValue}`;
-    const meanTemp = data[meanKey];
-
-    return meanTemp !== undefined ? parseFloat(meanTemp) : null;
-  } catch (error) {
-    console.error("Error fetching powiat meteo data:", error);
-    return null;
   }
-}
 
-// Function to update the powiat colors and tooltips when the slider value changes
-// Function to update the powiat colors and tooltips when the slider value changes
-async function updatePowiatColorsAndTooltips() {
-  if (powiatGeoJsonLayer) {
-    powiatGeoJsonLayer.eachLayer(async (layer) => {
-      if (layer instanceof L.Path) {
-        const geoJsonLayerT = layer as L.Path & { feature: GeoJSON.Feature };
-        if (geoJsonLayerT.feature) {
-          const feature = geoJsonLayerT.feature;
-          const teryt = feature.properties?.national_c; // Get the powiat TERYT
+  // Helper function to fetch powiat mean temperatures for the selected month
+  async function fetchPowiatMeteoData(
+    teryt: string,
+    sliderValue: number,
+  ): Promise<number | null> {
+    try {
+      const response = await fetch(`${base_url}/powiat_meteo/${teryt}`, {
+        method: "GET",
+      });
 
-          // Use the pre-fetched PowiatMeteo data
-          const meanTemp = await fetchPowiatMeteoData(teryt, sliderValue);
-          // Update tooltip content
-          const updatedTooltip = `Avrg Temp: ${meanTemp || "N/A"}`;
-          layer.setTooltipContent(updatedTooltip);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch powiat meteo data: ${response.statusText}`,
+        );
+      }
 
-          // Update powiat color only if we have a valid temperature
-          if (meanTemp !== null) {
-            const color = getColorForTemperature(meanTemp); // Get color for the temperature
-            layer.setStyle({
-              fillColor: color,
-              fillOpacity: 0.4,
-            });
-          } else {
-            layer.setStyle({
-              fillColor: "gray",
-              fillOpacity: 0.4,
-            });
+      const data = await response.json();
+      const meanKey = `mean${sliderValue}`;
+      const meanTemp = data[meanKey];
+
+      return meanTemp !== undefined ? parseFloat(meanTemp) : null;
+    } catch (error) {
+      console.error("Error fetching powiat meteo data:", error);
+      return null;
+    }
+  }
+
+  // Function to update the powiat colors and tooltips when the slider value changes
+  // Function to update the powiat colors and tooltips when the slider value changes
+  async function updatePowiatColorsAndTooltips() {
+    if (powiatGeoJsonLayer) {
+      powiatGeoJsonLayer.eachLayer(async (layer) => {
+        if (layer instanceof L.Path) {
+          const geoJsonLayerT = layer as L.Path & { feature: GeoJSON.Feature };
+          if (geoJsonLayerT.feature) {
+            const feature = geoJsonLayerT.feature;
+            const teryt = feature.properties?.national_c; // Get the powiat TERYT
+
+            // Use the pre-fetched PowiatMeteo data
+            const meanTemp = await fetchPowiatMeteoData(teryt, sliderValue);
+            // Update tooltip content
+            const updatedTooltip = `Avrg Temp: ${meanTemp || "N/A"}`;
+            layer.setTooltipContent(updatedTooltip);
+
+            // Update powiat color only if we have a valid temperature
+            if (meanTemp !== null) {
+              const color = getColorForTemperature(meanTemp); // Get color for the temperature
+              layer.setStyle({
+                fillColor: color,
+                fillOpacity: 0.4,
+              });
+            } else {
+              layer.setStyle({
+                fillColor: "gray",
+                fillOpacity: 0.4,
+              });
+            }
           }
         }
-      }
-    });
+      });
+    }
   }
-}
 
-
-// Reset Powiat layer
-function resetPowiatLayer() {
-  if (powiatGeoJsonLayer) {
-    map.removeLayer(powiatGeoJsonLayer);
-    layerControl.removeLayer(powiatGeoJsonLayer); // Remove from layer control
-    powiatGeoJsonLayer = null;
+  // Reset Powiat layer
+  function resetPowiatLayer() {
+    if (powiatGeoJsonLayer) {
+      map.removeLayer(powiatGeoJsonLayer);
+      layerControl.removeLayer(powiatGeoJsonLayer); // Remove from layer control
+      powiatGeoJsonLayer = null;
+    }
   }
-}
 
   // Reset map
   function showResetButton() {
@@ -343,20 +362,20 @@ function resetPowiatLayer() {
         sliderValueDisplay.textContent = sliderValue.toString();
         updateMarkerTooltips();
         updatePowiatColorsAndTooltips();
-        });
+      });
 
       sliderContainer.appendChild(sliderLabelContainer);
       sliderContainer.appendChild(slider);
       document.body.appendChild(sliderContainer);
-    };
-  };
+    }
+  }
 
   function hideSlider() {
     if (sliderContainer) {
       document.body.removeChild(sliderContainer);
       sliderContainer = null;
     }
-  };
+  }
 
   fetch(voivodeships_url, { method: "GET" })
     .then((response) => response.json())
@@ -385,8 +404,16 @@ function resetPowiatLayer() {
                   }
                 }
               });
-              fetchPowiatsAndAddToMap(powiats_url, feature.properties.national_c, map);
-              fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
+              fetchPowiatsAndAddToMap(
+                powiats_url,
+                feature.properties.national_c,
+                map,
+              );
+              fetchFeaturesAndAddMarkers(
+                `${base_url}/meteo`,
+                feature.properties.national_c,
+                map,
+              );
               showResetButton();
               showSlider(); // Show the slider when a feature is selected
             } else {
@@ -404,7 +431,6 @@ function resetPowiatLayer() {
       mapdiv.style.width = "100vw";
       map.invalidateSize();
     });
-
 </script>
 
 {#if loading}
@@ -440,7 +466,11 @@ function resetPowiatLayer() {
     inset: 0;
     border-radius: 50% 50% 0 50%;
     background: #0000;
-    background-image: radial-gradient(circle 11.2px at 50% 50%,#0000 94%, #ff4747);
+    background-image: radial-gradient(
+      circle 11.2px at 50% 50%,
+      #0000 94%,
+      #ff4747
+    );
   }
 
   .loader:after {
