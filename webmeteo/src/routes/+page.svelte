@@ -1,5 +1,6 @@
 <script lang="ts">
   import L, { LatLngBounds } from "leaflet";
+  import { get } from "svelte/store";
 
   const mapdiv = document.createElement("div");
   document.body.appendChild(mapdiv);
@@ -24,6 +25,7 @@
 
   let currentMarkersLayer: L.GeoJSON | null = null;
   let resetButton: HTMLButtonElement | null = null;
+  let powiatGeoJsonLayer: L.GeoJSON | null = null;
   let geoJsonLayer: L.GeoJSON | null = null;
   let sliderValue = 1; // Initial slider value
   let sliderContainer: HTMLDivElement | null = null;
@@ -67,8 +69,9 @@
       const data = await response.json();
 
       if (currentMarkersLayer) {
-        map.removeLayer(currentMarkersLayer);
-      }
+      map.removeLayer(currentMarkersLayer);
+      layerControl.removeLayer(currentMarkersLayer); // Remove from layer control
+    }
 
       // Convert GeoJSON features to Leaflet markers and add them to the map
       currentMarkersLayer = L.geoJSON(data, {
@@ -93,9 +96,7 @@
       });
 
       currentMarkersLayer.addTo(map);
-      map.fitBounds(currentMarkersLayer.getBounds(), {
-        padding: [10, 10], // Add a small margin around the markers
-      });
+      layerControl.addOverlay(currentMarkersLayer, "Markers"); // Add to layer control
       console.log("Markers added successfully");
     } catch (error) {
       console.error("Error fetching and adding markers:", error);
@@ -133,71 +134,122 @@
     }
   }
 
-  fetch(voivodeships_url, { method: "GET" })
-    .then((response) => response.json())
-    .then((data) => {
-      geoJsonLayer = L.geoJSON(data, {
-        style: { color: "red", weight: 4, fillColor: "red", fillOpacity: 0.2 },
-        onEachFeature: (feature, layer) => {
-          layer.on("click", () => {
-            if (feature.properties && feature.properties.national_c) {
-              geoJsonLayer?.eachLayer((otherLayer) => {
-                if (otherLayer instanceof L.Path) {
-                  if (otherLayer === layer) {
-                    otherLayer.setStyle({
-                      fillOpacity: 0,
-                      color: "blue",
-                      weight: 4,
-                    });
-                    otherLayer.bringToFront();
-                  } else {
-                    otherLayer.setStyle({
-                      fillOpacity: 0.2,
-                      fillColor: "red",
-                      color: "red",
-                      weight: 4,
-                    });
-                  }
-                }
-              });
-              fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
-              fetchPowiatsAndAddToMap(powiats_url, feature.properties.national_c, map);
-              showResetButton();
-              showSlider(); // Show the slider when a feature is selected
-            } else {
-              console.error("Feature does not have a 'national_c' property");
-            }
-          });
-        },
+  async function fetchPowiatsAndAddToMap(url: string, id: string, map: L.Map): Promise<void> {
+    try {
+      const response = await fetch(`${url}/${id}`, {
+        method: "GET",
       });
 
-      geoJsonLayer.addTo(map);
-      layerControl.addOverlay(geoJsonLayer, "Voivodeships");
+    if (!response.ok) {
+      throw new Error(`Failed to fetch powiats: ${response.statusText}`);
+    }
 
-      loading = false;
-      mapdiv.style.height = "100vh";
-      mapdiv.style.width = "100vw";
-      map.invalidateSize();
+    const data = await response.json();
+
+    // Clear the existing powiat layer if it exists
+    if (powiatGeoJsonLayer) {
+      map.removeLayer(powiatGeoJsonLayer);
+      layerControl.removeLayer(powiatGeoJsonLayer);
+    }
+
+    // Convert GeoJSON features to Leaflet polygons and add them to the map
+    powiatGeoJsonLayer = L.geoJSON(data, {
+        style: { color: "black", weight: 2, fillColor: "grey", fillOpacity: 0.3 },
+        onEachFeature: async (feature, layer) => {
+          const meanTemp = await fetchPowiatMeteoData(feature.properties?.national_c, sliderValue);
+          const tooltipContent = `Avg Temp: ${meanTemp || "N/A"}`;
+          layer.bindTooltip(tooltipContent, { 
+            className: "custom-tooltip", // Optional: Add a class for custom styling
+            permanent: false, // Optional: Tooltips will show on hover, not always visible
+            offset: [0, -10] // Optional: Adjust the tooltip position
+          });
+        }
+      });
+    }
+    catch (error) {
+      console.error("Error fetching and adding powiats:", error);
+    }
+    if (powiatGeoJsonLayer) {
+      powiatGeoJsonLayer.addTo(map);
+
+      // Add powiats layer to layer control
+      layerControl.addOverlay(powiatGeoJsonLayer, "Powiats");
+
+      map.fitBounds(powiatGeoJsonLayer.getBounds(), {
+          padding: [10, 10], // Add a small margin around the markers
+    });
+    updatePowiatColorsAndTooltips();
+  }
+}
+
+
+// Helper function to fetch powiat mean temperatures for the selected month
+async function fetchPowiatMeteoData(teryt: string, sliderValue: number): Promise<number | null> {
+  try {
+    const response = await fetch(`${base_url}/powiat_meteo/${teryt}`, {
+      method: "GET",
     });
 
-    async function fetchPowiatsAndAddToMap(url: string, id: string, map: L.Map): Promise<void> {
-      try {
-        const response = await fetch(`${url}/${id}`, {
-          method: "GET",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch powiats: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        const d = L.geoJSON(data, { style: { color: "blue", weight: 4 } });
-        layerControl.addOverlay(d, "Powiaty");
-      } catch (error) {
-        console.error("Error fetching and adding powiats:", error);
-      }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch powiat meteo data: ${response.statusText}`);
     }
+
+    const data = await response.json();
+    const meanKey = `mean${sliderValue}`;
+    const meanTemp = data[meanKey];
+
+    return meanTemp !== undefined ? parseFloat(meanTemp) : null;
+  } catch (error) {
+    console.error("Error fetching powiat meteo data:", error);
+    return null;
+  }
+}
+
+// Function to update the powiat colors and tooltips when the slider value changes
+// Function to update the powiat colors and tooltips when the slider value changes
+async function updatePowiatColorsAndTooltips() {
+  if (powiatGeoJsonLayer) {
+    powiatGeoJsonLayer.eachLayer(async (layer) => {
+      if (layer instanceof L.Path) {
+        const geoJsonLayerT = layer as L.Path & { feature: GeoJSON.Feature };
+        if (geoJsonLayerT.feature) {
+          const feature = geoJsonLayerT.feature;
+          const teryt = feature.properties?.national_c; // Get the powiat TERYT
+
+          // Use the pre-fetched PowiatMeteo data
+          const meanTemp = await fetchPowiatMeteoData(teryt, sliderValue);
+          // Update tooltip content
+          const updatedTooltip = `Avrg Temp: ${meanTemp || "N/A"}`;
+          layer.setTooltipContent(updatedTooltip);
+
+          // Update powiat color only if we have a valid temperature
+          if (meanTemp !== null) {
+            const color = getColorForTemperature(meanTemp); // Get color for the temperature
+            layer.setStyle({
+              fillColor: color,
+              fillOpacity: 0.4,
+            });
+          } else {
+            layer.setStyle({
+              fillColor: "gray",
+              fillOpacity: 0.4,
+            });
+          }
+        }
+      }
+    });
+  }
+}
+
+
+// Reset Powiat layer
+function resetPowiatLayer() {
+  if (powiatGeoJsonLayer) {
+    map.removeLayer(powiatGeoJsonLayer);
+    layerControl.removeLayer(powiatGeoJsonLayer); // Remove from layer control
+    powiatGeoJsonLayer = null;
+  }
+}
 
   // Reset map
   function showResetButton() {
@@ -216,6 +268,7 @@
 
       resetButton.addEventListener("click", () => {
         resetMap();
+        resetPowiatLayer(); // Clear powiat data
         hideResetButton();
         hideSlider();
       });
@@ -235,6 +288,7 @@
     map.setView(initialView.center, initialView.zoom);
     if (currentMarkersLayer) {
       map.removeLayer(currentMarkersLayer);
+      layerControl.removeLayer(currentMarkersLayer);
       currentMarkersLayer = null;
     }
     if (geoJsonLayer) {
@@ -287,23 +341,70 @@
       slider.addEventListener("input", (event) => {
         sliderValue = parseInt((event.target as HTMLInputElement).value);
         sliderValueDisplay.textContent = sliderValue.toString();
-        if (currentMarkersLayer) {
-          updateMarkerTooltips();
-        }
-      });
+        updateMarkerTooltips();
+        updatePowiatColorsAndTooltips();
+        });
 
       sliderContainer.appendChild(sliderLabelContainer);
       sliderContainer.appendChild(slider);
       document.body.appendChild(sliderContainer);
-    }
-  }
+    };
+  };
 
   function hideSlider() {
     if (sliderContainer) {
       document.body.removeChild(sliderContainer);
       sliderContainer = null;
     }
-  }
+  };
+
+  fetch(voivodeships_url, { method: "GET" })
+    .then((response) => response.json())
+    .then((data) => {
+      geoJsonLayer = L.geoJSON(data, {
+        style: { color: "red", weight: 4, fillColor: "red", fillOpacity: 0.2 },
+        onEachFeature: (feature, layer) => {
+          layer.on("click", () => {
+            if (feature.properties && feature.properties.national_c) {
+              geoJsonLayer?.eachLayer((otherLayer) => {
+                if (otherLayer instanceof L.Path) {
+                  if (otherLayer === layer) {
+                    otherLayer.setStyle({
+                      fillOpacity: 0,
+                      color: "blue",
+                      weight: 4,
+                    });
+                    otherLayer.bringToFront();
+                  } else {
+                    otherLayer.setStyle({
+                      fillOpacity: 0.2,
+                      fillColor: "red",
+                      color: "red",
+                      weight: 4,
+                    });
+                  }
+                }
+              });
+              fetchPowiatsAndAddToMap(powiats_url, feature.properties.national_c, map);
+              fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
+              showResetButton();
+              showSlider(); // Show the slider when a feature is selected
+            } else {
+              console.error("Feature does not have a 'national_c' property");
+            }
+          });
+        },
+      });
+
+      geoJsonLayer.addTo(map);
+      layerControl.addOverlay(geoJsonLayer, "Voivodeships");
+
+      loading = false;
+      mapdiv.style.height = "100vh";
+      mapdiv.style.width = "100vw";
+      map.invalidateSize();
+    });
+
 </script>
 
 {#if loading}

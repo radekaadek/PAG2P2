@@ -16,7 +16,7 @@ def calculate_means_for_powiats(redis_client, col):
             continue
         
         means = {}
-        count = len(features)
+        count = {}
         
         for feature in features:
             for key, value in feature['properties'].items():
@@ -25,10 +25,13 @@ def calculate_means_for_powiats(redis_client, col):
                         continue
                     if key not in means:
                         means[key] = 0
+                    if key not in count:
+                        count[key] = 0
                     means[key] += value
+                    count[key] += 1
         
         for key in means:
-            means[key] /= count
+            means[key] /= count[key]
         
         for key, value in means.items():
             redis_client.hset(f'powiat_means:{powiat_id}', key, value)

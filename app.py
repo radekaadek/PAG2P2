@@ -78,7 +78,7 @@ async def get_powiat_means(powiat_teryt: str):
 @app.get("/powiats_in_voivodeship/{voivodeship_teryt}")
 async def get_powiats_in_voivodeship(voivodeship_teryt: str):
     powiats = redis_client.hgetall('powiaty')
-    matching_powiats = {key: value for key, value in powiats.items() if key.decode('utf-8').startswith(f"b'{voivodeship_teryt}")}
+    matching_powiats = [json.loads(value) for key, value in powiats.items() if key.decode('utf-8').startswith(f"{voivodeship_teryt}")]
     if not matching_powiats:
         return HTTPException(status_code=404, detail="No powiats found for the given voivodeship")
-    return {key.decode('utf-8'): json.loads(value) for key, value in matching_powiats.items()}
+    return matching_powiats
