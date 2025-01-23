@@ -2,26 +2,15 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from file_prep import prep_files
-from data2geojson import download_imgw_data, data2geojson
-from redis_fun import redis_init
-from mongo_fun import mongo_init, mongo_get_by_polygon
+from redis_fun import redis_con
+from mongo_fun import mongo_con, mongo_get_by_polygon
 
-#Prep files
-# prep_files() #makes geojson from shp (voivodeships, powiats)
-#Imgw
-# download_imgw_data()
-# data2geojson()
-
-#Redis load data and init connection
-voivodeships_clean_json = "Projekt-blok-2/Dane/woj.geojson"
-powiats_clean_json = "Projekt-blok-2/Dane/powiaty.geojson"
-redis_client = redis_init(voivodeships_clean_json, powiats_clean_json) #localhost:6379 hardcoded in redis_fun xd
+# Connection to redis
+redis_client = redis_con()
 
 #Mongo load data and init connection
-geojson_path = 'Projekt-blok-2/Dane/data.geojson'
 mongo_address = "mongodb://localhost:27017/"
-con, col = mongo_init(geojson_path, mongo_address)
+con, col = mongo_con(mongo_address)
 
 #Fast api init
 app = FastAPI()
@@ -78,3 +67,18 @@ async def get_meteo(voivodeship_teryt: str):
         return HTTPException(status_code=404, detail="Meteo not found")
     return features
 
+@app.get("/powiat_meteo/{powiat_teryt}")
+async def get_powiat_means(powiat_teryt: str):
+    print(f"powiat_means: b'{powiat_teryt}'")
+    means = redis_client.hgetall(f"powiat_means:b'{powiat_teryt}'")
+    if not means:
+        return HTTPException(status_code=404, detail="Powiat means not found")
+    return {key.decode('utf-8'): float(value) for key, value in means.items()}
+
+@app.get("/powiats_in_voivodeship/{voivodeship_teryt}")
+async def get_powiats_in_voivodeship(voivodeship_teryt: str):
+    powiats = redis_client.hgetall('powiaty')
+    matching_powiats = {key: value for key, value in powiats.items() if key.decode('utf-8').startswith(f"b'{voivodeship_teryt}")}
+    if not matching_powiats:
+        return HTTPException(status_code=404, detail="No powiats found for the given voivodeship")
+    return {key.decode('utf-8'): json.loads(value) for key, value in matching_powiats.items()}

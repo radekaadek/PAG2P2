@@ -3,8 +3,19 @@ import redis
 
 def redis_init(voivodeships_path, powiats_path):
     # load geojsons back as python jsons
-    voivodeships_clean_json = json.load(open(voivodeships_path))
-    powiats_clean_json = json.load(open(powiats_path))
+    # voivodeships_clean_json = json.load(open(voivodeships_path))
+    # powiats_clean_json = json.load(open(powiats_path))
+    try:
+        voivodeships_clean_json = json.load(open(voivodeships_path))
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON from {voivodeships_path}: {e}")
+        return None
+
+    try:
+        powiats_clean_json = json.load(open(powiats_path))
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON from {powiats_path}: {e}")
+        return None
 
 
     # Example: Storing data in Redis
@@ -19,6 +30,10 @@ def redis_init(voivodeships_path, powiats_path):
     # add clean voivodeships and powiats
     redis_client.hset('voivodeships_clean', 'geojsons', json.dumps(voivodeships_clean_json))
     redis_client.hset('powiaty_clean', 'geojsons', json.dumps(powiats_clean_json))
+    return redis_client
+
+def redis_con():
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
     return redis_client
 
 if __name__ == '__main__':

@@ -39,6 +39,12 @@ def mongo_get_by_polygon(column, polygon_data):
             feature["_id"] = str(feature["_id"])
     return features
 
+def mongo_con(mongo_adr):
+    connection = pymongo.MongoClient(mongo_adr)
+    database = connection.baza
+    column = database.stacje
+    return connection, column
+
 if __name__ == '__main__':
     geojson_path = 'Projekt-blok-2/Dane/data.geojson'
     mongo_address = "mongodb://localhost:27017/"

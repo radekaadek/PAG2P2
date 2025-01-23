@@ -20,6 +20,7 @@
 
   const base_url = "http://localhost:8000";
   const voivodeships_url = `${base_url}/voivodeships`;
+  const powiats_url = `${base_url}/powiats_in_voivodeship`;
 
   let currentMarkersLayer: L.GeoJSON | null = null;
   let resetButton: HTMLButtonElement | null = null;
@@ -76,7 +77,7 @@
           const color = getColorForTemperature(isNaN(meanTemp) ? null : meanTemp);
 
           const marker = L.circleMarker(latlng, {
-            radius: 8,
+            radius: 15,
             fillColor: color,
             color: "#000", // Border color
             weight: 1,
@@ -160,6 +161,7 @@
                 }
               });
               fetchFeaturesAndAddMarkers(`${base_url}/meteo`, feature.properties.national_c, map);
+              fetchPowiatsAndAddToMap(powiats_url, feature.properties.national_c, map);
               showResetButton();
               showSlider(); // Show the slider when a feature is selected
             } else {
@@ -177,6 +179,25 @@
       mapdiv.style.width = "100vw";
       map.invalidateSize();
     });
+
+    async function fetchPowiatsAndAddToMap(url: string, id: string, map: L.Map): Promise<void> {
+      try {
+        const response = await fetch(`${url}/${id}`, {
+          method: "GET",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch powiats: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        const d = L.geoJSON(data, { style: { color: "blue", weight: 4 } });
+        layerControl.addOverlay(d, "Powiaty");
+      } catch (error) {
+        console.error("Error fetching and adding powiats:", error);
+      }
+    }
 
   // Reset map
   function showResetButton() {
